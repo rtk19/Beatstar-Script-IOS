@@ -55,14 +55,16 @@ export default class CustomSongReader {
       const brokenSongs = [];
 
       Logger.log("[readCustomSongsOnDevice] Getting directory listing");
-      const files = mscorlib
-        .class("System.IO.Directory")
-        .method("GetDirectories")
-        .invoke(Il2Cpp.string(directory));
+
+      const directoryInfo = mscorlib.class("System.IO.DirectoryInfo").alloc();
+
+      directoryInfo.method(".ctor").invoke(Il2Cpp.string(directory));
+
+      const files = directoryInfo.method("GetDirectories").invoke();
       Logger.log(`[readCustomSongsOnDevice] Found ${files.length} directories`);
 
       for (const file of files) {
-        const path = file.toString().slice(1, -1);
+        const path = file.toString();
         Logger.log(`[readCustomSongsOnDevice] Processing directory: ${path}`);
 
         promises.push(
@@ -117,7 +119,12 @@ export default class CustomSongReader {
               let config;
 
               // check if config.json exists
-              if (mscorlib.class("System.IO.File").method("Exists").invoke(Il2Cpp.string(`${path}/config.json`))) {
+              if (
+                mscorlib
+                  .class("System.IO.File")
+                  .method("Exists")
+                  .invoke(Il2Cpp.string(`${path}/config.json`))
+              ) {
                 try {
                   config = mscorlib
                     .class("System.IO.File")
@@ -132,13 +139,13 @@ export default class CustomSongReader {
                       let subKeys = Object.keys(config[key]);
                       for (const subKey of subKeys) {
                         t._Song[subKey] = config[key][subKey];
-                        t._BeatmapVariantReference._Song[subKey] = config[key][subKey];
+                        t._BeatmapVariantReference._Song[subKey] =
+                          config[key][subKey];
                       }
                     }
                   }
-                } catch (e) { }
+                } catch (e) {}
               }
-
 
               Logger.log(
                 `[readCustomSongsOnDevice] Building template for: ${data.title}`
@@ -201,7 +208,8 @@ export default class CustomSongReader {
           )}`
         );
         Device.alert(
-          `${brokenSongs.length} broken song${brokenSongs.length === 1 ? "" : "s"
+          `${brokenSongs.length} broken song${
+            brokenSongs.length === 1 ? "" : "s"
           } detected. See log for names.`
         );
       }
