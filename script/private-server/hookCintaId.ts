@@ -11,12 +11,10 @@ export const hookCintaId = () => {
 
   loginRuntime.class("CintaProvider").method("Populate").implementation =
     function (command) {
-      console.log("POPULATE");
       this.method("Populate").invoke(command);
       const user = Il2Cpp.string(
         fs.readFileSync(Device.documents("user")).toString().trim()
       );
-      console.log("CINTA", user);
       command.field("Cinta").value = user;
     };
 };

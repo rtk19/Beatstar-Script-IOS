@@ -12,7 +12,6 @@ import { ignoreBundleHash } from "../customs/ignoreBundleHash.js";
 import { hookRemoteBundles } from "../customs/hookRemoteBundles.js";
 import Translation from "../lib/Translation.js";
 import Logger from "../lib/Logger.js";
-import { disableChecksum } from "./disableChecksum.js";
 
 export const hookSupportButton = async () => {
   Logger.log("[unlockCustomSongs] Setting up custom songs hook...");
@@ -30,9 +29,6 @@ export const hookSupportButton = async () => {
       const metalogic = Il2Cpp.domain.assembly("MetaLogic").image;
       Logger.log("[SupportButtonPressed] Assemblies loaded");
 
-      disableChecksum();
-      Logger.log("Disabled checksum");
-
       setDataCache(new DataCache(RakshaModel));
       Logger.log("[SupportButtonPressed] DataCache initialized");
 
@@ -40,8 +36,8 @@ export const hookSupportButton = async () => {
       Logger.log("[SupportButtonPressed] Song names hacked");
 
       hookOnDeviceBundles();
-      ignoreBundleHash();
       hookRemoteBundles();
+      ignoreBundleHash();
       Logger.log("[SupportButtonPressed] Bundles hooked");
 
       const translations = Il2Cpp.gc.choose(
