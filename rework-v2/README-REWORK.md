@@ -20,6 +20,10 @@ Device payload changes are limited to:
 - automatic custom-song loading after the real
   `Dispatching OnMainMenuActive event`, with a short bounded readiness retry
   window and no managed-heap polling during login;
+- automatic custom-song reloading after the first main-menu activation that
+  follows an iOS background transition, including the session rebuild that can
+  follow a long suspension; ordinary in-app main-menu visits are ignored,
+  rapid duplicate events are coalesced, and refreshes still cannot overlap;
 - lifecycle-safe refresh state: Unity/IL2CPP objects are reacquired on every
   attempt, startup and Support loads cannot overlap, and a failed attempt does
   not poison later retries;

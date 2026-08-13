@@ -3,6 +3,27 @@
 This changelog covers the changes made in this fork after
 `ExternalAddress4401/Beatstar-Script-IOS`.
 
+## v26 - 2026-08-13
+
+### Lifecycle-aware custom-song loading
+
+- Fixed automatic custom-song loading after Beatclone has been running in the
+  background. The app now observes the iOS background transition and refreshes
+  custom songs after the next valid main-menu activation.
+- Ordinary in-app main-menu visits are ignored, avoiding unnecessary song-list
+  registration after completing or leaving a song.
+- Rapid or repeated lifecycle events are coalesced. A pending automatic refresh
+  is also skipped when another automatic or Support-button refresh has already
+  completed, preserving the non-overlapping refresh behavior introduced in
+  v25.
+
+### Release artifact
+
+- Confirmed that the public IPA contains no embedded provisioning profile and
+  remains ad-hoc signed for AltStore to sign during installation.
+- File: `Beatclone-36.1.4-minimal-rework-v26.ipa`
+- SHA-256: `e1bcbd2108d551d36c792bfba31c947df0ea5f8127135528cce089692d80b95d`
+
 ## v25 - 2026-08-13
 
 ### Startup and packaging

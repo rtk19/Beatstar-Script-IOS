@@ -23,16 +23,62 @@ interface SavedScore {
 }
 
 let loading = false;
-let startupTriggered = false;
 let bundleHooksInstalled = false;
 let appendedTranslationCount = 0;
 let lastAssignedTranslationLength = 0;
 let successfulLoadCount = 0;
+let mainMenuEventCount = 0;
+let mainMenuLoadGeneration = 0;
+let resumeRefreshArmed = false;
+let lifecycleObserverInstalled = false;
+const lifecycleObserverReferences: any[] = [];
 
 const STARTUP_DELAY_MS = 1500;
 const STARTUP_RETRY_DELAY_MS = 1000;
 const STARTUP_MAX_ATTEMPTS = 8;
 const SCORE_REQUEST_TIMEOUT_MS = 10000;
+
+export const installCustomSongLifecycleObserver = () => {
+  if (lifecycleObserverInstalled) return;
+
+  try {
+    if (!ObjC.available) {
+      Logger.log("[CustomSongs] iOS lifecycle observer unavailable");
+      return;
+    }
+
+    const notificationCenter =
+      ObjC.classes.NSNotificationCenter.defaultCenter();
+    const notificationName = ObjC.classes.NSString.stringWithString_(
+      "UIApplicationDidEnterBackgroundNotification"
+    );
+    const backgroundBlock = new ObjC.Block({
+      retType: "void",
+      argTypes: ["object"],
+      implementation() {
+        resumeRefreshArmed = true;
+        Logger.log(
+          "[CustomSongs] app entered background; next main menu will refresh songs"
+        );
+      },
+    });
+    const observer =
+      notificationCenter.addObserverForName_object_queue_usingBlock_(
+        notificationName,
+        null,
+        ObjC.classes.NSOperationQueue.mainQueue(),
+        backgroundBlock
+      );
+
+    // Frida must keep both the native block and observer token alive for the
+    // lifetime of the payload.
+    lifecycleObserverReferences.push(backgroundBlock, observer);
+    lifecycleObserverInstalled = true;
+    Logger.log("[CustomSongs] installed iOS background lifecycle observer");
+  } catch (error) {
+    Logger.log(`[CustomSongs] lifecycle observer setup failed: ${error}`);
+  }
+};
 
 const requireManagedObject = (
   objects: Il2Cpp.Object[],
@@ -249,7 +295,7 @@ const applySavedScores = async () => {
 };
 
 export const refreshCustomSongs = async (
-  source: "startup" | "support"
+  source: "startup" | "resume" | "support"
 ): Promise<boolean> => {
   if (loading) {
     Logger.log(`[CustomSongs] ${source} refresh skipped: load already active`);
@@ -399,47 +445,92 @@ export const refreshCustomSongs = async (
   }
 };
 
-const runStartupLoad = async (attempt: number) => {
-  if (successfulLoadCount > 0) {
-    Logger.log("[CustomSongs] startup load skipped: songs already refreshed");
+const runMainMenuLoad = async (
+  generation: number,
+  successfulLoadsAtSchedule: number,
+  source: "startup" | "resume",
+  attempt: number
+) => {
+  if (generation !== mainMenuLoadGeneration) {
+    Logger.log(
+      `[CustomSongs] ${source} load superseded by a newer main menu event`
+    );
+    return;
+  }
+
+  // A Support refresh, or a load started for an earlier menu event, may finish
+  // while this delayed attempt is waiting. Do not immediately register every
+  // song a second time against the same live model.
+  if (successfulLoadCount > successfulLoadsAtSchedule) {
+    Logger.log(`[CustomSongs] ${source} load skipped: songs already refreshed`);
     return;
   }
 
   Logger.log(
-    `[CustomSongs] startup readiness attempt ${attempt}/${STARTUP_MAX_ATTEMPTS}`
+    `[CustomSongs] ${source} readiness attempt ${attempt}/${STARTUP_MAX_ATTEMPTS}`
   );
   let loaded = false;
   try {
     loaded = await Il2Cpp.perform(
-      () => refreshCustomSongs("startup"),
+      () => refreshCustomSongs(source),
       "main"
     );
   } catch (error) {
-    Logger.log(`[CustomSongs] startup thread scheduling failed: ${error}`);
+    Logger.log(`[CustomSongs] ${source} thread scheduling failed: ${error}`);
   }
-  if (loaded || successfulLoadCount > 0) return;
+  if (
+    loaded ||
+    successfulLoadCount > successfulLoadsAtSchedule ||
+    generation !== mainMenuLoadGeneration
+  ) {
+    return;
+  }
 
   if (attempt < STARTUP_MAX_ATTEMPTS) {
-    Logger.log("[CustomSongs] startup not ready; retry scheduled");
+    Logger.log(`[CustomSongs] ${source} not ready; retry scheduled`);
     setTimeout(
-      () => void runStartupLoad(attempt + 1),
+      () =>
+        void runMainMenuLoad(
+          generation,
+          successfulLoadsAtSchedule,
+          source,
+          attempt + 1
+        ),
       STARTUP_RETRY_DELAY_MS
     );
   } else {
     Logger.log(
-      "[CustomSongs] startup retries exhausted; Support can retry safely"
+      `[CustomSongs] ${source} retries exhausted; Support can retry safely`
     );
   }
 };
 
-export const handleCustomSongStartupLog = (message: string) => {
-  if (
-    startupTriggered ||
-    !message.startsWith("Dispatching OnMainMenuActive event")
-  ) {
+export const handleCustomSongMainMenuLog = (message: string) => {
+  if (!message.startsWith("Dispatching OnMainMenuActive event")) {
     return;
   }
-  startupTriggered = true;
-  Logger.log("[CustomSongs] main menu event received; scheduling startup load");
-  setTimeout(() => void runStartupLoad(1), STARTUP_DELAY_MS);
+
+  const isStartup = mainMenuEventCount === 0;
+  if (!isStartup && !resumeRefreshArmed) {
+    return;
+  }
+
+  mainMenuEventCount++;
+  resumeRefreshArmed = false;
+  const generation = ++mainMenuLoadGeneration;
+  const successfulLoadsAtSchedule = successfulLoadCount;
+  const source = isStartup ? "startup" : "resume";
+  Logger.log(
+    `[CustomSongs] main menu event ${mainMenuEventCount} received; scheduling ${source} load`
+  );
+  setTimeout(
+    () =>
+      void runMainMenuLoad(
+        generation,
+        successfulLoadsAtSchedule,
+        source,
+        1
+      ),
+    STARTUP_DELAY_MS
+  );
 };

@@ -1,13 +1,18 @@
 import Logger from "../lib/Logger";
-import { handleCustomSongStartupLog } from "../customs/loadCustomSongs.js";
+import {
+  handleCustomSongMainMenuLog,
+  installCustomSongLifecycleObserver,
+} from "../customs/loadCustomSongs.js";
 
 const forwardLog = (message: Il2Cpp.Object) => {
   const text = message.toString();
   Logger.log(text);
-  handleCustomSongStartupLog(text);
+  handleCustomSongMainMenuLog(text);
 };
 
 export const logErrors = () => {
+  installCustomSongLifecycleObserver();
+
   const logger = Il2Cpp.domain
     .assembly("SpaceApe.Logger")
     .image.class("Logger");

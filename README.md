@@ -2,24 +2,24 @@
 
 This is a community-maintained fork of
 [ExternalAddress4401/Beatstar-Script-IOS](https://github.com/ExternalAddress4401/Beatstar-Script-IOS).
-It contains the iOS Beatclone script work and the v25 minimal rework for
+It contains the iOS Beatclone script work and the current minimal rework for
 Beatstar 36.1.4.
 
-## Install v25
+## Install v26
 
 Follow the complete [Beatclone iOS installation
 instructions](https://beatclone.com/install/), with one important change:
 when the instructions tell you to download the IPA, download the newest IPA
 attached to this repository's **Releases** page instead. For this release,
-choose `Beatclone-36.1.4-minimal-rework-v25.ipa` from the **v25** release.
+choose `Beatclone-36.1.4-minimal-rework-v26.ipa` from the **v26** release.
 
 Do not use an older IPA linked from the installation page. Continue with the
 remaining instructions there, including AltStore installation, the exact
 `user` filename, and the asset archive import.
 
-## v25 source
+## Release source
 
-The source used for the v25 IPA is in [`rework-v2`](rework-v2). It starts from
+The source used for the v26 IPA is in [`rework-v2`](rework-v2). It starts from
 the upstream `private-server-frida-16` implementation and keeps the original
 working bootstrap/playback contract while applying the focused reliability,
 custom-song, search, and score-restoration fixes documented in
@@ -27,12 +27,12 @@ custom-song, search, and score-restoration fixes documented in
 
 The root `script` directory records the earlier self-contained bootstrap
 approach developed during the same investigation. It is retained for reference
-and is not the source of the attached v25 release IPA.
+and is not the source of the attached v26 release IPA.
 
 ## Development and rebuilding
 
 The following information applies to the root experimental implementation.
-For the exact v25 architecture and build notes, see
+For the exact release architecture and build notes, see
 [`rework-v2/README-REWORK.md`](rework-v2/README-REWORK.md).
 
 This root implementation builds the Frida scripts used by Beatclone and can
