@@ -13,33 +13,40 @@ import { disableTutorial } from "../functions/disableTutorial.js";
 import { disableNews } from "../functions/disableNews.js";
 import Logger from "../lib/Logger.js";
 
+let activated = false;
+
+const installFeature = (name: string, install: () => void) => {
+  try {
+    install();
+    Logger.log(`[activateMod] Installed ${name}`);
+    return true;
+  } catch (error: any) {
+    Logger.log(
+      `[activateMod] Skipped ${name}: ${error?.stack || error?.message || error}`
+    );
+    return false;
+  }
+};
+
 export const activateMod = () => {
+  if (activated) {
+    Logger.log("Mod already activated");
+    return;
+  }
+  activated = true;
   Logger.log("Activating mod...");
-  killErrorHandler();
-  Logger.log("Killed error handler");
-  disableChecksum();
-  Logger.log("Disabled checksum");
-  customColors();
-  Logger.log("Custom colors");
-  freeUnlimitedPlay();
-  Logger.log("Free unlimited play");
-  freeRestarts();
-  Logger.log("Free restarts");
-  saveScores();
-  Logger.log("Saved scores");
-  unlockAllSkins();
-  Logger.log("Unlocked all skins");
-  noFail();
-  Logger.log("No fail");
-  autoplay();
-  Logger.log("Autoplay");
-  search();
-  Logger.log("Search");
-  forcePlayableSongs();
-  Logger.log("Force playable songs");
-  disableTutorial();
-  Logger.log("Disabled tutorial");
-  disableNews();
-  Logger.log("Disabled news");
+  installFeature("error handler", killErrorHandler);
+  installFeature("checksum bypass", disableChecksum);
+  installFeature("custom colors", customColors);
+  installFeature("unlimited play", freeUnlimitedPlay);
+  installFeature("free restarts", freeRestarts);
+  installFeature("score saving", saveScores);
+  installFeature("all skins", unlockAllSkins);
+  installFeature("no fail", noFail);
+  installFeature("autoplay", autoplay);
+  installFeature("search", search);
+  installFeature("playable-song override", forcePlayableSongs);
+  installFeature("tutorial bypass", disableTutorial);
+  installFeature("news suppression", disableNews);
   Logger.log("Mod activated");
 };

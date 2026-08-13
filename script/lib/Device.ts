@@ -59,12 +59,67 @@ class Device {
     });
   }
 
+  static showLoading(message: string): () => void {
+    let controller: any = null;
+
+    ObjC.schedule(ObjC.mainQueue, () => {
+      try {
+        const UIApplication = ObjC.classes.UIApplication;
+        const UIAlertController = ObjC.classes.UIAlertController;
+        const windowScene = UIApplication.sharedApplication()
+          .connectedScenes()
+          .allObjects()
+          .objectAtIndex_(0);
+        const keyWindow = windowScene.windows().firstObject();
+        let viewController = keyWindow.rootViewController();
+        while (viewController.presentedViewController()) {
+          viewController = viewController.presentedViewController();
+        }
+
+        controller =
+          UIAlertController.alertControllerWithTitle_message_preferredStyle_(
+            "Beatclone",
+            message,
+            1
+          );
+        viewController.presentViewController_animated_completion_(
+          controller,
+          true,
+          null
+        );
+      } catch (error) {
+        Logger.log(`[Device] Could not show loading overlay: ${error}`);
+      }
+    });
+
+    return () => {
+      ObjC.schedule(ObjC.mainQueue, () => {
+        try {
+          if (controller) {
+            controller.dismissViewControllerAnimated_completion_(true, null);
+            controller = null;
+          }
+        } catch (error) {
+          Logger.log(`[Device] Could not dismiss loading overlay: ${error}`);
+        }
+      });
+    };
+  }
+
   static documents(path?: string): string {
     const basePath =
       ObjC.classes.NSProcessInfo.processInfo()
         .environment()
         .objectForKey_("HOME")
         .toString() + "/Documents/";
+
+    return path ? basePath + path : basePath;
+  }
+
+  static frameworks(path?: string): string {
+    const basePath =
+      ObjC.classes.NSBundle.mainBundle().bundlePath().toString() +
+      "/Frameworks/";
 
     return path ? basePath + path : basePath;
   }

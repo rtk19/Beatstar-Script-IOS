@@ -1,7 +1,8 @@
 const esbuild = require("esbuild");
 const fs = require("fs");
+const path = require("path");
 
-const outfile = "file.js";
+const scriptRoot = __dirname;
 
 /**
  * Crypto isn't supported without a shim so we'll use xor encoding instead
@@ -19,15 +20,10 @@ const xor = (data) => {
   return str.join("");
 };
 
-async function build(prod, test, agent) {
+async function build(entryPoint, outfile, prod) {
   await esbuild.build({
-    entryPoints: [
-      test
-        ? "./test/test.js"
-        : agent
-        ? "./agent/agent.js"
-        : "./device/device.js",
-    ],
+    absWorkingDir: scriptRoot,
+    entryPoints: [entryPoint],
     bundle: true,
     outfile,
     minify: prod,
@@ -81,10 +77,31 @@ async function run() {
   const prod = process.argv.includes("-prod");
   const test = process.argv.includes("-test");
   const agent = process.argv.includes("-agent");
+  const outfileArgumentIndex = process.argv.indexOf("--outfile");
+  const requestedEntry = process.argv.slice(2).find((argument, index, args) => {
+    if (argument.startsWith("-")) return false;
+    return index === 0 || args[index - 1] !== "--outfile";
+  });
+  const entryPoint = path.resolve(
+    scriptRoot,
+    requestedEntry ||
+      (test ? "test/test.ts" : agent ? "agent/agent.ts" : "device/device.ts")
+  );
+  const outfile = path.resolve(
+    scriptRoot,
+    outfileArgumentIndex === -1
+      ? "file.js"
+      : process.argv[outfileArgumentIndex + 1]
+  );
 
-  await build(prod, test, agent);
+  if (!fs.existsSync(entryPoint)) {
+    throw new Error(`Entry point does not exist: ${entryPoint}`);
+  }
+
+  await fs.promises.mkdir(path.dirname(outfile), { recursive: true });
+  await build(entryPoint, outfile, prod);
   let file = fs
-    .readFileSync(`./${outfile}`)
+    .readFileSync(outfile)
     .toString()
     .replaceAll(
       "bo.HTTPParser=T",
@@ -102,10 +119,13 @@ async function run() {
 
   if (prod) {
     const write = prod ? xor(file.join("\n")) : file.join("\n");
-    fs.writeFileSync(`./${outfile}`, Buffer.from(write).toString("base64"));
+    fs.writeFileSync(outfile, Buffer.from(write).toString("base64"));
   } else {
-    fs.writeFileSync(`./${outfile}`, file.join("\n"));
+    fs.writeFileSync(outfile, file.join("\n"));
   }
 }
 
-run();
+run().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

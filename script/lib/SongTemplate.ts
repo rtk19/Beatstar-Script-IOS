@@ -7,6 +7,7 @@ import WwiseSwitch from "./WwiseSwitch.js";
 import SongStreakColorTemplate from "./SongStreakColorTemplate.js";
 import Translation from "./Translation.js";
 import SongMetaTemplate from "./SongMetaTemplate.js";
+import { customAssetId } from "./CustomSongIdentity.js";
 
 interface ColorGradient {
   color: string;
@@ -226,18 +227,22 @@ export default class SongTemplate {
       );
     if (this._SongArtistLoc)
       template.field("_SongArtistLoc").value = this._SongArtistLoc.build();
-    if (this.SongMeta) {
-      this.SongMeta = new SongMetaTemplate(this.id, this.idLabel);
-    }
+    // SongMeta is optional and its backing field differs between game versions.
+    // Avoid assigning it directly; the song and variant contain everything the
+    // custom-song flow needs.
+    if (this.audioAsset_id)
+      template.field("audioAsset_id").value = Il2Cpp.string(this.audioAsset_id);
     template.field("_audioAsset").value = this._audioAsset.build();
 
     return template;
   }
   test() {
+    const artworkAssetId = customAssetId(1, this.id);
+    const audioAssetId = customAssetId(2, this.id);
     this.BPM = 140;
-    this.CoverArtAsset_id = "292f1a28f6388794f87eae271f91692b";
+    this.CoverArtAsset_id = artworkAssetId;
     this._CoverArtAsset = new UnityAsset(
-      "292f1a28f6388794f87eae271f91692b",
+      artworkAssetId,
       "Assets/Textures/AlbumArtwork/FooFighter_Everlong.png",
       this.path + "artwork.bundle"
     );
@@ -288,8 +293,7 @@ export default class SongTemplate {
     this.TrackIntensityGlow = "145F95"; //full background color
     this.VFXColor = "003B6C"; //slight star outline at the top
     this.VFXAlternativeColor = "005F8E"; //???
-    this.BibleId = "TST00025";
-    //this.BibleId = 'TST00026';
+    this.BibleId = `BC${this.id}`;
     this.idLabel = this.path;
     this.ISRC = "";
     this.LegalState = new LegalState("Approved");
@@ -305,8 +309,9 @@ export default class SongTemplate {
     this._MusicKitData = null;
     this.SongMeta = new SongMetaTemplate(this.id, this.idLabel);
 
+    this.audioAsset_id = audioAssetId;
     this._audioAsset = new UnityAsset(
-      "292f1a28f6388794f87eae271f91692c",
+      audioAssetId,
       "Assets/Audio/Banks/TST00026.bytes",
       this.path + "audio.bundle"
     );

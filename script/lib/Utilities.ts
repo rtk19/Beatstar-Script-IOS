@@ -2,38 +2,78 @@ import http from "@frida/http";
 import Logger from "../lib/Logger.js";
 import Device from "./Device.js";
 import ObjC from "frida-objc-bridge";
+import SettingsReader from "./SettingsReader.js";
 
-export const networkRequest = (path: string, data: object = {}): any => {
+const NETWORK_TIMEOUT_MS = 8000;
+
+export const networkRequest = (
+  path: string,
+  data: object = {}
+): Promise<string> => {
+  const configuredHost = SettingsReader.getSetting("ip");
+  const configuredPort = SettingsReader.getSetting("port");
   const options = {
-    hostname: "143.110.226.4",
-    port: 5000,
+    hostname: configuredHost || "143.110.226.4",
+    port: configuredPort || 5000,
     path: path,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: {
-      data: JSON.stringify(data),
-    },
   };
 
-  let result = "";
+  return new Promise(function (resolve, reject) {
+    let settled = false;
+    let result = "";
+    let timeout: ReturnType<typeof setTimeout>;
 
-  return new Promise(function (resolve) {
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (error) reject(error);
+      else resolve(result);
+    };
+
     try {
       const req = http.request(options, (res: any) => {
         res.on("data", (d: any) => {
           result += d;
         });
 
-        res.on("end", (d: any) => {
-          resolve(result);
+        res.on("end", () => {
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            const body = result.trim().slice(0, 500);
+            finish(
+              new Error(
+                `Server returned HTTP ${res.statusCode}${
+                  body ? `: ${body}` : " with an empty response"
+                }`
+              )
+            );
+            return;
+          }
+          finish();
         });
+
+        res.on("error", (error: Error) => finish(error));
       });
+
+      req.on("error", (error: Error) => finish(error));
+
+      timeout = setTimeout(() => {
+        const error = new Error(
+          `Request to ${path} timed out after ${NETWORK_TIMEOUT_MS}ms`
+        );
+        req.destroy(error);
+        finish(error);
+      }, NETWORK_TIMEOUT_MS);
 
       req.write(JSON.stringify(data));
       req.end();
-    } catch (e) {}
+    } catch (error) {
+      finish(error as Error);
+    }
   });
 };
 

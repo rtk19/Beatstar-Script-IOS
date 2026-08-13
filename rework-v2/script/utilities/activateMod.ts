@@ -1,0 +1,30 @@
+import { customColors } from "../functions/customColors.js";
+import { freeRestarts } from "../hacks/freeRestarts.js";
+import { noFail } from "../functions/noFail.js";
+import { autoplay } from "../functions/autoplay.js";
+import { search } from "../functions/search.js";
+import { forcePlayableSongs } from "../hacks/forcePlayableSongs.js";
+import { disableTutorial } from "../functions/disableTutorial.js";
+import Logger from "../lib/Logger.js";
+import { hookSupportButton } from "../hacks/hookSupportButton.js";
+
+export const activateMod = () => {
+  Logger.log("Activating mod...");
+  customColors();
+  Logger.log("Custom colors");
+  freeRestarts();
+  Logger.log("Free restarts");
+  noFail();
+  Logger.log("No fail");
+  autoplay();
+  Logger.log("Autoplay");
+  search();
+  Logger.log("Search");
+  forcePlayableSongs();
+  Logger.log("Force playable songs");
+  disableTutorial();
+  Logger.log("Disabled tutorial");
+  hookSupportButton();
+  Logger.log("Hooked support button");
+  Logger.log("Mod activated");
+};

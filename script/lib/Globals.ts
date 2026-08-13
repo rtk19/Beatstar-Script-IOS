@@ -4,7 +4,7 @@ import DataCache from "./DataCache.js";
 let customSongs: any[] = [];
 let lastNote: any = null;
 let dataCache: DataCache;
-let scores: Score[];
+let scores: Score[] = [];
 let offline: boolean = false;
 
 const setLastNote = (value: any) => {
@@ -20,7 +20,23 @@ const setDataCache = (value: DataCache) => {
 };
 
 const setScores = (value: Score[]) => {
-  scores = value;
+  scores = Array.isArray(value) ? value : [];
+};
+
+const upsertScore = (value: Score) => {
+  const beatmapId = Number(value.beatmapId);
+  const score = Number(value.score);
+  if (!Number.isFinite(beatmapId) || !Number.isFinite(score)) return;
+
+  const existing = scores.find(
+    (candidate) => Number(candidate.beatmapId) === beatmapId
+  );
+  if (existing) {
+    existing.score = Math.max(Number(existing.score) || 0, score);
+    existing.beatmapId = beatmapId;
+  } else {
+    scores.push({ beatmapId, score });
+  }
 };
 
 const setOffline = (value: boolean) => {
@@ -37,5 +53,6 @@ export {
   setCustomSongs,
   setDataCache,
   setScores,
+  upsertScore,
   setOffline,
 };

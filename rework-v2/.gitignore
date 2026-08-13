@@ -1,0 +1,26 @@
+# macOS system files
+**/.DS_Store
+
+# Development environments
+.vscode/
+node_modules/
+
+# iOS build files
+*.ipa
+*.mobileprovision
+**/Payload
+beatstar.ipa
+Payload.zip
+
+# Python
+venv/
+
+# Logs
+*.log
+
+# Scripts
+script/device.js
+script/script.js
+script/wwise/
+script/file.js
+script/override.js

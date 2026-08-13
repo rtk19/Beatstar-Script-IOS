@@ -17,7 +17,9 @@ NC='\033[0m' # No Color
 BEATCLONE_VERSION="1.0"
 LOG_FILE="beatclone.log"
 
-clear
+if [ -t 1 ]; then
+    clear
+fi
 
 # Initialize log file with timestamp
 echo "=== BEATCLONE $BEATCLONE_VERSION - Started at $(date) ===" > "$LOG_FILE"
@@ -94,6 +96,7 @@ show_help() {
     echo -e "  ${PURPLE}${BOLD}install${NC}                    Install from Payload"
     echo -e "  ${PURPLE}${BOLD}clean${NC}                      Clean up temporary files"
     echo -e "  ${PURPLE}${BOLD}script${NC}                     Compile and update the script"
+    echo -e "  ${PURPLE}${BOLD}repack [SOURCE] [OUTPUT]${NC}    Rebuild an existing instrumented IPA for AltStore"
     echo -e "  ${PURPLE}${BOLD}offsets${NC}                    Get offsets (jailbreak only)"
     echo -e "  ${PURPLE}${BOLD}help${NC}                       Show this help message"
     echo
@@ -281,6 +284,8 @@ fi
 shift
 
 SIGNING_KEY=""
+SOURCE_IPA=""
+OUTPUT_IPA=""
 DEBUG_MODE=false
 
 # Parse options and positional parameters
@@ -292,6 +297,10 @@ while [[ "$#" -gt 0 ]]; do
         *)
             if [ "$COMMAND" = "build" ] && [ -z "$SIGNING_KEY" ]; then
                 SIGNING_KEY="$1"
+            elif [ "$COMMAND" = "repack" ] && [ -z "$SOURCE_IPA" ]; then
+                SOURCE_IPA="$1"
+            elif [ "$COMMAND" = "repack" ] && [ -z "$OUTPUT_IPA" ]; then
+                OUTPUT_IPA="$1"
             else
                 log_error "Unknown option or extra parameter: $1"
                 show_help
@@ -307,6 +316,11 @@ done
 #===============================================================================
 
 case $COMMAND in
+    repack)
+        source_ipa="${SOURCE_IPA:-beatclone-ipa/Beatclone.ipa}"
+        output_ipa="${OUTPUT_IPA:-dist/Beatclone-36.1.4-updated.ipa}"
+        "$PWD/scripts/repack-ipa.sh" "$source_ipa" "$output_ipa"
+        ;;
     build)
         if [ -z "$SIGNING_KEY" ]; then
             log_error "Signing key is required for build"

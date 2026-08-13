@@ -1,0 +1,395 @@
+#!/bin/bash
+
+#===============================================================================
+# CONFIGURATION AND INITIALIZATION
+#===============================================================================
+
+# Enable error handling
+set -e
+
+# Color definitions
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+BEATCLONE_VERSION="1.0"
+LOG_FILE="beatclone.log"
+
+clear
+
+# Initialize log file with timestamp
+echo "=== BEATCLONE $BEATCLONE_VERSION - Started at $(date) ===" > "$LOG_FILE"
+
+#===============================================================================
+# LOGGING FUNCTIONS
+#===============================================================================
+
+# Regular debug log - only shown in debug mode
+log_info() {
+    if [ "$DEBUG_MODE" = true ]; then
+        echo -e "${BLUE}${BOLD}beatclone ${BLUE}${BOLD}[INFO]${NC} > $1"
+        echo "[INFO] $1" >> "$LOG_FILE"
+    fi
+}
+
+# Important log - always shown
+log_step() {
+    echo -e "${BLUE}${BOLD}beatclone ${BLUE}${BOLD}[INFO]${NC} > $1"
+    echo "[INFO] $1" >> "$LOG_FILE"
+}
+
+log_warning() {
+    if [ "$DEBUG_MODE" = true ]; then
+        echo -e "${PURPLE}${BOLD}beatclone ${PURPLE}${BOLD}[WARNING]${NC} > $1"
+        echo "[WARNING] $1" >> "$LOG_FILE"
+    fi
+}
+
+log_error() {
+    echo -e "${RED}${BOLD}beatclone ${RED}${BOLD}[ERROR]${NC} > $1"
+    echo "[ERROR] $1" >> "$LOG_FILE"
+}
+
+log_debug() {
+    if [ "$DEBUG_MODE" = true ]; then
+        echo -e "${BLUE}${BOLD}beatclone ${BLUE}${BOLD}[DEBUG]${NC} > $1"
+        echo "[DEBUG] $1" >> "$LOG_FILE"
+    fi
+}
+
+log_finish() {
+    echo "=== BEATCLONE $BEATCLONE_VERSION - Finished at $(date) ===" >> "$LOG_FILE"
+}
+
+# Add trap to handle script exit
+trap log_finish EXIT
+
+#===============================================================================
+# UTILITY FUNCTIONS
+#===============================================================================
+
+cleanup_temp() {
+    log_step "Cleaning up temporary files..."
+    rm -rf beatstar-frida-codesigned.zip 2>/dev/null || true
+    rm -rf beatstar-frida-codesigned.ipa 2>/dev/null || true
+    rm -rf Payload.ipa 2>/dev/null || true
+    rm -rf script.js 2>/dev/null || true
+    rm -rf Payload.zip 2>/dev/null || true
+}
+
+cleanup() {
+    cleanup_temp
+    rm -rf Payload 2>/dev/null || true
+}
+
+show_help() {
+    echo -e "${BLUE}${BOLD}BEATCLONE $BEATCLONE_VERSION${NC}"
+    echo
+    echo -e "${BLUE}${BOLD}USAGE:${NC} $0 <command> [options]"
+    echo
+    echo -e "${BLUE}${BOLD}COMMANDS:${NC}"
+    echo -e "  ${PURPLE}${BOLD}build${NC}        B             BuildIPA"
+    echo -e "  ${PURPLE}${BOLD}install${NC}                    Install from Payload"
+    echo -e "  ${PURPLE}${BOLD}clean${NC}                      Clean up temporary files"
+    echo -e "  ${PURPLE}${BOLD}script${NC}                     Compile and update the script"
+    echo -e "  ${PURPLE}${BOLD}offsets${NC}                    Get offsets (jailbreak only)"
+    echo -e "  ${PURPLE}${BOLD}help${NC}                       Show this help message"
+    echo
+    echo -e "${BLUE}${BOLD}OPTIONS:${NC}"
+    echo -e "  ${PURPLE}${BOLD}-d, --debug${NC}                Enable verbose logging"
+}
+
+#===============================================================================
+# ENVIRONMENT SETUP FUNCTIONS
+#===============================================================================
+
+setup_python_env() {
+    if [ ! -d "venv" ]; then
+        python3 -m venv venv || {
+            log_error "Failed to create virtual environment"
+            exit 1
+        }
+    fi
+
+    source venv/bin/activate || {
+        log_error "Failed to activate virtual environment"
+        exit 1
+    }
+
+    log_step "Installing/Updating required Python packages..."
+    pip install --upgrade pip setuptools > /dev/null 2>&1 || {
+        log_error "Failed to upgrade pip and setuptools"
+        exit 1
+    }
+    pip install objection > /dev/null 2>&1 || {
+        log_error "Failed to install objection"
+        exit 1
+    }
+
+    if ! command -v objection &> /dev/null; then
+        log_error "objection installation failed"
+        exit 1
+    fi
+}
+
+#===============================================================================
+# BUILD AND DEPLOYMENT FUNCTIONS
+#===============================================================================
+
+build_script() {
+    log_step "Building the script..."
+    cd script
+    if ! node ./build.js -agent > /dev/null 2>&1; then
+        log_error "Failed to build script"
+        exit 1
+    fi
+    mv script.js ../
+    cd ../
+
+    if [ -d "Payload/Beatstar.app/Frameworks" ]; then
+        log_info "Updating script in Payload/Frameworks..."
+        if ! cp script.js "Payload/Beatstar.app/Frameworks/" > /dev/null 2>&1; then
+            log_error "Failed to copy script to Frameworks directory"
+            exit 1
+        fi
+    fi
+}
+
+install() {
+    log_step "Installing from Payload folder..."
+
+    if [ ! -d "./Payload" ]; then
+        log_error "Payload directory not found, please build the IPA first"
+        exit 1
+    fi
+
+    if [ "$DEBUG_MODE" = true ]; then
+        log_debug "Running ios-deploy in debug mode..."
+        if ! ios-deploy --bundle Payload/Beatstar.app -W --debug; then
+            log_error "Failed to deploy to device in debug mode"
+            exit 1
+        fi
+    else
+        if ! ios-deploy --bundle Payload/Beatstar.app -W > /dev/null 2>&1; then
+            log_error "Failed to deploy to device"
+            exit 1
+        fi
+    fi
+
+    log_step "Installation completed successfully!"
+}
+
+offsets() {
+    log_step "Starting offsets generation..."
+
+    (cd ./script && npm run getOffsets) || {
+        log_error "Failed to compile getOffsets"
+        exit 1
+    }
+
+    log_step "Running frida..."
+    (
+        frida -U -f com.spaceapegames.beatstar -l script/getOffsets.js > out.txt 2>&1 &
+        FRIDA_PID=$!
+
+        sleep 30
+
+        if kill -0 $FRIDA_PID 2>/dev/null; then
+            kill $FRIDA_PID 2>/dev/null
+            pkill -f "frida.*beatstar" 2>/dev/null
+        fi
+    )
+
+    if [ -f "out.txt" ]; then
+        sed -n '/{/,/}/p' out.txt | sed '$d' > out.tmp && mv out.tmp out.txt
+        if [ -s out.txt ]; then
+            log_step "Offsets generation completed successfully!"
+        else
+            log_error "No offsets found in output"
+            exit 1
+        fi
+    else
+        log_error "Failed to generate offsets"
+        exit 1
+    fi
+}
+
+#===============================================================================
+# ARGUMENT PARSING AND COMMAND EXECUTION
+#===============================================================================
+
+# Parse arguments
+COMMAND=$1
+
+if [ -z "$COMMAND" ]; then
+    show_help
+    exit 0
+fi
+
+shift
+
+SIGNING_KEY=""
+DEBUG_MODE=false
+
+# Parse options and positional parameters
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -d|--debug)
+            DEBUG_MODE=true
+            ;;
+        *)
+            if [ "$COMMAND" = "build" ] && [ -z "$SIGNING_KEY" ]; then
+                SIGNING_KEY="$1"
+            else
+                log_error "Unknown option or extra parameter: $1"
+                show_help
+                exit 1
+            fi
+            ;;
+    esac
+    shift
+done
+
+#===============================================================================
+# MAIN COMMAND HANDLER
+#===============================================================================
+
+case $COMMAND in
+    build)
+        log_step "Starting build process..."
+        cleanup
+
+        setup_python_env
+
+        log_step "Checking required files..."
+        if [ ! -d "./script" ]; then
+            log_error "The script folder is missing"
+            exit 1
+        fi
+
+        if [ ! -f "beatstar.ipa" ]; then
+            log_error "beatstar.ipa not found in current directory"
+            exit 1
+        fi
+
+        if [ ! -f "config.json" ]; then
+            log_error "config.json not found in current directory"
+            exit 1
+        fi
+
+        log_step "Installing/Updating npm dependencies..."
+        if [ "$DEBUG_MODE" = true ]; then
+            (cd ./script && npm i) || {
+                log_error "Failed to install npm dependencies"
+                exit 1
+            }
+        else
+            (cd ./script && npm i > /dev/null 2>&1) || {
+                log_error "Failed to install npm dependencies"
+                exit 1
+            }
+        fi
+
+        build_script
+
+        log_step "Patching IPA with objection..."
+        if ! objection patchipa --source beatstar.ipa --gadget-config config.json --script-source script.js --codesign-signature "$SIGNING_KEY" > /dev/null 2>&1; then
+            log_error "Failed to patch IPA with objection"
+            exit 1
+        fi
+
+        log_step "Extracting patched IPA..."
+        if ! unzip -o -q beatstar-frida-codesigned.ipa; then
+            log_error "Failed to extract patched IPA"
+            exit 1
+        fi
+
+        log_step "Modifying Info.plist..."
+        plist_file="Payload/Beatstar.app/Info.plist"
+        if [ ! -f "$plist_file" ]; then
+            log_error "Info.plist not found at: $plist_file"
+            exit 1
+        fi
+
+        plutil -replace CFBundleIdentifier -string "com.beatclone.beatstar" "$plist_file"
+        plutil -replace CFBundleDisplayName -string "Beatclone" "$plist_file"
+        plutil -replace "CFBundleURLTypes.0.CFBundleURLSchemes.0" -string "beatclone" "$plist_file"
+
+        log_step "Running scanner..."
+        test=$(node scanner.js)
+        if [ $? -ne 0 ]; then
+            log_error "Scanner failed"
+            exit 1
+        fi
+        log_debug "Scanner output: $test"
+
+        # Convert test string to array of arguments
+        IFS=' ' read -r -a test_args <<< "$test"
+
+        log_step "Running graft..."
+        unity_framework="Payload/Beatstar.app/Frameworks/UnityFramework.framework/UnityFramework"
+        unity_framework_abs=$(realpath "$unity_framework")
+
+        # Debug logging
+        log_debug "Test arguments: ${test_args[@]}"
+        log_debug "Number of offsets: $((${#test_args[@]}/2))"
+        log_debug "Executing: ./graft ${test_args[@]} '$unity_framework_abs'"
+
+        # Execute graft with error handling
+        {
+            ./graft "${test_args[@]}" "$unity_framework_abs"
+        } 2>graft_error.log
+
+        if [ $? -ne 0 ]; then
+            log_error "Graft operation failed"
+            if [ -f graft_error.log ]; then
+                log_error "Graft error output:"
+                cat graft_error.log
+            fi
+            exit 1
+        fi
+
+        # Verify results
+        if [ ! -f "$unity_framework" ] || [ ! -s "$unity_framework" ]; then
+            log_error "UnityFramework file is missing or empty after graft operation"
+            exit 1
+        fi
+
+        log_step "Preparing IPA..."
+        if ! zip -rq Payload.ipa Payload; then
+            log_error "Failed to create Payload.ipa"
+            exit 1
+        fi
+
+        cleanup_temp
+
+        if [ "$VIRTUAL_ENV" != "" ]; then
+            deactivate
+        fi
+
+        log_step "Build process completed successfully!"
+        ;;
+    install)
+        install
+        ;;
+    clean)
+        cleanup
+        log_step "Cleanup completed!"
+        ;;
+    script)
+        build_script
+        ;;
+    offsets)
+        offsets
+        ;;
+    help)
+        show_help
+        ;;
+    *)
+        log_error "Unknown command: $COMMAND"
+        show_help
+        exit 1
+        ;;
+esac

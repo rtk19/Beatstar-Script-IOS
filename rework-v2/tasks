@@ -1,0 +1,6 @@
+- Add list of all iphone versions
+- Add support for opening documents folder from my files
+- Extract new decrypted IPA
+- Generate new graft
+- Make objection use frida 16
+- Add logging to frida-il2cpp-bridge perform/initialize?

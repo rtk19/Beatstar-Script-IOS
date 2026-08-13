@@ -11,19 +11,16 @@ const getLocalVersion = () => {
   }
 };
 
-const getLiveVersion = async (): Promise<string> => {
-  return new Promise(function (resolve, reject) {
-    try {
-      networkRequest("/versionios", {
-        version: getLocalVersion(),
-      }).then((liveVersion: string) => {
-        resolve(liveVersion);
-      });
-    } catch (e) {
-      const error = e as Error;
-      Logger.log(`Got an error contacting the server: ${error.message}`);
-    }
-  });
+const getLiveVersion = async (): Promise<string | null> => {
+  try {
+    return await networkRequest("/versionios", {
+      version: getLocalVersion(),
+    });
+  } catch (e) {
+    const error = e as Error;
+    Logger.log(`Got an error contacting the server: ${error.message}`);
+    return null;
+  }
 };
 
 export { getLocalVersion, getLiveVersion };

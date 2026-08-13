@@ -1,6 +1,8 @@
 import ObjC from "frida-objc-bridge";
 
 class Logger {
+  private sequence = 0;
+
   constructor() {
     this.createLogFile();
   }
@@ -37,10 +39,16 @@ class Logger {
     var fileHandle =
       ObjC.classes.NSFileHandle.fileHandleForUpdatingAtPath_(documentsFolder);
     fileHandle.seekToEndOfFile();
-    var string = ObjC.classes.NSString.stringWithString_(message + "\n");
+    const timestamp = new Date().toISOString();
+    const line = `[${String(++this.sequence).padStart(4, "0")}] ${timestamp} ${message}`;
+    var string = ObjC.classes.NSString.stringWithString_(line + "\n");
     var data = string.dataUsingEncoding_(4);
     fileHandle.writeData_(data);
     fileHandle.closeFile();
+
+    try {
+      console.log(line);
+    } catch (_) {}
   }
 }
 

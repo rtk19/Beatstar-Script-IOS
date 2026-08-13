@@ -5,7 +5,9 @@
     "agent": "node_modules/.bin/frida-compile agent/agent.ts -o script.js -c -w",
     "debug": "node_modules/.bin/frida-compile agent/debug.ts -o debug.js -c",
     "getOffsets": "node_modules/.bin/frida-compile device/graft.ts -o getOffsets.js -c",
-    "iOSBuild": "node ./build.js ./device/device.ts"
+    "iOSBuild": "node ./build.js ./device/device.ts",
+    "iOSAgent": "node ./build.js ./agent/packaged.ts --outfile ../build/script.js",
+    "iOSPayload": "node ./build.js ./device/device.ts --outfile ../build/fallback.js -prod"
   },
   "dependencies": {
     "@frida/assert": "^3.0.2",
@@ -25,7 +27,7 @@
     "esbuild": "^0.17.18",
     "frida-compile": "^16.2.1",
     "frida-fs": "^7.0.0",
-    "frida-il2cpp-bridge": "^0.12.0",
+    "frida-il2cpp-bridge": "0.9.0",
     "frida-java-bridge": "^7.0.10",
     "frida-objc-bridge": "^8.0.5"
   }

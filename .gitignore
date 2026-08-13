@@ -25,3 +25,18 @@ script/wwise/
 script/file.js
 script/override.js
 
+# Local proprietary/sensitive build inputs and generated outputs
+clean-ipa/
+beatclone-ipa/
+asset-archive/
+user-file/
+build/
+dist/
+
+# Local investigation worktrees and extracted app bundles
+rework/
+rework-v2/package*/
+rework-v2/script/node_modules/
+rework-v2/graft
+rework-v2/script/*.cs
+tools/

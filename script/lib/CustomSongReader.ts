@@ -4,7 +4,7 @@ import BeatmapTemplate from "./BeatmapTemplate.js";
 import DataCache from "./DataCache.js";
 import Logger from "./Logger.js";
 import Device from "./Device.js";
-import Java from "frida-java-bridge";
+import { normalizeCustomSongId } from "./CustomSongIdentity.js";
 
 const patchFile = (path: string, offset: number) => {
   const mscorlib = Il2Cpp.domain.assembly("mscorlib").image;
@@ -54,6 +54,7 @@ export default class CustomSongReader {
       const moddedFiles = [];
       const promises = [];
       const brokenSongs = [];
+      const seenSongIds = new Set<number>();
 
       Logger.log("[readCustomSongsOnDevice] Getting directory listing");
       const files = mscorlib
@@ -88,8 +89,14 @@ export default class CustomSongReader {
                 `[readCustomSongsOnDevice] Parsed song data: ${data.title}`
               );
 
+              const songId = normalizeCustomSongId(data.id);
+              if (seenSongIds.has(songId)) {
+                throw new Error(`Duplicate custom song id ${songId}`);
+              }
+              seenSongIds.add(songId);
+
               data.path = `file:///${path}/`;
-              let t = new BeatmapTemplate(parseInt(data.id), data.path);
+              let t = new BeatmapTemplate(songId, data.path);
 
               let score = data.maxScore ? parseInt(data.maxScore) : 500000;
               let difficultyId = data.difficulty;
@@ -179,7 +186,7 @@ export default class CustomSongReader {
                 this.dataCache.getDifficultyById(difficultyId);
 
               moddedFiles.push({
-                id: data.id,
+                id: songId,
                 title: data.title,
                 artist: data.artist,
                 template: template,

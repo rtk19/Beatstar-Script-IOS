@@ -5,6 +5,7 @@ import SongDifficulty from "./SongDifficulty.js";
 import UnityAsset from "./UnityAsset.js";
 import AnimationCurveTO from "./AnimationCurveTO.js";
 import BeatmapType, { BeatmapTypeEnum } from "./BeatmapType.js";
+import { customAssetId } from "./CustomSongIdentity.js";
 
 export default class BeatmapVariant {
   id: number;
@@ -77,9 +78,8 @@ export default class BeatmapVariant {
     return template;
   }
   test() {
-    //this.id = 508;
-    this.id = 2223;
-    this.idLabel = "77-1";
+    this.id = this.Song_id;
+    this.idLabel = `beatclone-${this.Song_id}`;
     this._Song = new SongTemplate(this.Song_id, this.path);
     this._Song.test();
     this.MaxNumLanes = 3;
@@ -90,13 +90,12 @@ export default class BeatmapVariant {
     this._Difficulty.test();
     this.Version = 1;
     this.IsComplete = true;
-    this.InteractionsReference_id = 2223;
-    //this.InteractionsReference_id = 508;
+    this.InteractionsReference_id = this.Song_id;
     this._InteractionsReference = null;
     this.NumStars = 5;
-    this.InteractionsAsset_id = "5f2e85c4a16fd491c9527e2c25764141";
+    this.InteractionsAsset_id = customAssetId(3, this.Song_id);
     this._InteractionsAsset = new UnityAsset(
-      "5f2e85c4a16fd491c9527e2c25764141",
+      this.InteractionsAsset_id,
       "Assets/beatmapInteractions/508.bytes",
       this.path + "chart.bundle"
     );
